@@ -1,22 +1,22 @@
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from tools import search_web
 
 load_dotenv()
 
-# Configurar credencial para el SDK
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     os.environ["GOOGLE_API_KEY"] = api_key
 
-# 1. Inicializar el LLM
+# Inicializar modelo
 llm = ChatGoogleGenerativeAI(
     model="gemini-3.6-flash"
 )
 
 def format_llm_response(content) -> str:
-    """Normaliza la salida del LLM a texto plano legible."""
+    """Normaliza la salida del LLM a texto plano sin bloques de diccionario."""
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, list):
@@ -33,56 +33,89 @@ def format_llm_response(content) -> str:
         return content["text"].strip()
     return str(content).strip()
 
-def generate_morning_briefing(topic: str, max_results: int = 4) -> str:
-    """
-    Extrae noticias usando tools.py y genera un resumen ejecutivo estructurado con Gemini.
-    """
-    print(f"[*] Buscando noticias recientes sobre: '{topic}'...")
-    news_items = search_web.invoke({"query": topic, "max_results": max_results})
+def build_analysis_prompt(topic: str, raw_context: str) -> str:
+    """Prompt adaptado para análisis tecnológico generalista y riguroso."""
+    today = datetime.now().strftime("%d-%m-%Y")
     
-    if not news_items:
-        return "No se encontraron noticias recientes sobre el tema especificado."
+    return f"""Eres un Lead Technology Analyst redactando el briefing diario de tecnología ({today}).
 
-    # Estructuramos el contexto recopilado por el buscador
-    context_lines = []
-    for idx, item in enumerate(news_items, start=1):
-        context_lines.append(
-            f"[{idx}] Titulo: {item.get('title')}\n"
-            f"    Fecha: {item.get('date', 'Desconocida')}\n"
-            f"    Fuente: {item.get('url')}\n"
-            f"    Extracto: {item.get('body')}\n"
-        )
-    raw_context = "\n".join(context_lines)
+OBJETIVO:
+Sintetizar las novedades más relevantes del sector tecnológico global basadas en el material provisto.
 
-    # Prompt disenado para analisis tecnico y profesional
-    prompt = f"""Eres un analista de inteligencia y tecnologia. Analiza las siguientes noticias recientes recopiladas de internet y elabora un briefing ejecutivo estructurado.
+RESTRICCIONES:
+- Tono analítico, objetivo y sobrio. Sin introducciones de cortesía ni despedidas.
+- Prohibidas frases vacías de relleno publicitario o entusiasmo artificial.
+- Si un dato o enlace no aparece en el extracto, no lo inventes ni asumas.
+- Idioma: Español técnico profesional.
 
-REGLAS DE FORMATO:
-- Tono sobrio, tecnico y objetivo (sin introducciones conversacionales ni lenguaje informal).
-- Estructura:
-  1. Resumen Ejecutivo (un parrafo sintetizando el panorama global).
-  2. Puntos Clave / Hallazgos (lista con lo mas critico).
-  3. Fuentes de Referencia (titulos y enlaces de origen).
-- No inventes informacion ajena a los extractos proporcionados.
+ESTRUCTURA (Markdown estricto):
 
-NOTICIAS RECOPILADAS:
+# Tech Morning Briefing
+*Fecha: {today} | Cobertura: {topic}*
+
+## 1. Panorama Global
+(Un único párrafo de 3-4 líneas resumiendo las corrientes dominantes de la jornada en la industria tech).
+
+## 2. Novedades y Movimientos Clave
+Para cada noticia relevante recopilada:
+- **Titular / Movimiento:** [Qué ocurrió de forma concreta]
+  - **Área:** [Inteligencia Artificial | Hardware & Semiconductores | Software & Cloud | Industria & Regulación | Ciberseguridad]
+  - **Detalle Técnico/Estratégico:** [1-2 líneas explicando el impacto, lanzamiento, cambio arquitectónico o cifra clave]
+  - **Repercusión en el Ecosistema:** [Qué significa para desarrolladores, empresas o el mercado]
+
+## 3. Fuentes
+- [[Título del artículo]](URL_completa)
+
+MATERIAL RECOPILADO:
 {raw_context}
 """
 
-    print("[*] Sintetizando informacion con Gemini...")
+def generate_morning_briefing(topic: str, max_results: int = 5) -> str:
+    print(f"[*] Rastreador: Extrayendo {max_results} noticias sobre '{topic}'...")
+    news_items = search_web.invoke({"query": topic, "max_results": max_results})
+    
+    if not news_items:
+        return "No se localizaron registros recientes para el tema consultado."
+
+    context_lines = []
+    for idx, item in enumerate(news_items, start=1):
+        context_lines.append(
+            f"Item #{idx}:\n"
+            f"- Titular: {item.get('title')}\n"
+            f"- Fecha: {item.get('date', 'N/D')}\n"
+            f"- Enlace: {item.get('url')}\n"
+            f"- Extracto: {item.get('body')}\n"
+        )
+    raw_context = "\n".join(context_lines)
+
+    print("[*] Motor IA: Procesando matriz de inteligencia...")
+    prompt = build_analysis_prompt(topic, raw_context)
     response = llm.invoke(prompt)
     return format_llm_response(response.content)
 
-# --- EJECUCION PRINCIPAL ---
+def save_report(content: str, filename_prefix: str = "briefing") -> str:
+    """Exporta el reporte a un directorio dedicado."""
+    os.makedirs("reports", exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    filepath = os.path.join("reports", f"{filename_prefix}_{timestamp}.md")
+    
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+    return filepath
+
 if __name__ == "__main__":
-    tema_interes = "cybersecurity vulnerabilities"
+    # Query amplia orientada a noticias tecnológicas destacadas
+    tema = "technology news AI hardware software big tech"
+    
     print("=" * 60)
-    print("AI MORNING BRIEFING - INICIANDO SISTEMA")
+    print("AI TECH BRIEFING - EJECUCIÓN GENERAL")
     print("=" * 60)
     
-    informe = generate_morning_briefing(tema_interes, max_results=4)
+    # max_results=6 o 7 para dar mayor variedad temática al informe
+    informe = generate_morning_briefing(tema, max_results=6)
+    ruta_archivo = save_report(informe, filename_prefix="tech_briefing")
     
     print("\n" + "=" * 60)
-    print("INFORME GENERADO:")
+    print(f"REPORTE GUARDADO EN: {ruta_archivo}")
     print("=" * 60 + "\n")
     print(informe)
