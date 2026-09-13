@@ -32,7 +32,6 @@ def send_email_report(markdown_content: str, subject_prefix: str = "Global Tech 
     # Transformar Markdown a HTML
     html_body = markdown.markdown(markdown_content)
 
-    # Plantilla HTML con estilo sobrio para lectura en clientes de correo
     styled_html = f"""<!DOCTYPE html>
 <html>
   <head>
@@ -60,20 +59,8 @@ def send_email_report(markdown_content: str, subject_prefix: str = "Global Tech 
         print(f"[+] Correo enviado exitosamente a: {receiver_email}")
         return True
     except smtplib.SMTPAuthenticationError:
-        print("[!] Error de autenticación: Verifica que la 'Contraseña de aplicación' de 16 caracteres en .env sea exacta.")
+        print("[!] Error de autenticación: Verifica la 'Contraseña de aplicación' en .env.")
         return False
     except Exception as e:
         print(f"[!] Error al enviar correo: {e}")
         return False
-
-if __name__ == "__main__":
-    print("Iniciando prueba de conexión con Gmail...")
-    test_content = """# Prueba de Conexión
-Este es un correo de prueba de **AI Morning Briefing**.
-
-- **Canal**: Gmail SMTP (SSL:465)
-- **Estado**: Operativo
-- **Visualización**: HTML y Markdown
-"""
-    send_email_report(test_content, subject_prefix="Prueba de Sistema")
-
